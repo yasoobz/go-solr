@@ -72,6 +72,16 @@ type Collection struct {
 	NumFound int
 }
 
+type GroupResults struct {
+	Matches int
+	Groups []Group
+}
+
+type Group struct {
+	GroupValue string
+	DocList *Collection
+}
+
 // Parsed result for SearchHandler response, ie /select
 type SolrResult struct {
 	Status         int         // status quick access to status
@@ -88,6 +98,7 @@ type SolrResult struct {
 	MoreLikeThis   map[string]interface{} // MoreLikeThis using Search (select) Component
 	SpellCheck     map[string]interface{} // SpellCheck using SpellCheck (spell) Component
 	NextCursorMark string
+	GroupedResults map[string]GroupResults
 }
 
 // Parsed result for MoreLikeThisHandler response, ie /mlt

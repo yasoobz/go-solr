@@ -48,6 +48,8 @@ func (parser *ExtensiveResultParser) Parse(resp_ *[]byte) (*SolrResult, error) {
 	response.Status = int(jsonbuf["responseHeader"].(map[string]interface{})["status"].(float64))
 
 	sr.Results = new(Collection)
+	sr.GroupedResults = make(map[string]GroupResults)
+
 	sr.Status = response.Status
 	if nextCursorMark, ok := jsonbuf["nextCursorMark"]; ok {
 		sr.NextCursorMark = fmt.Sprintf("%s", nextCursorMark)
@@ -101,11 +103,14 @@ func (parser *ExtensiveResultParser) ParseJsonFacets(response *SolrResponse, sr 
 	}
 }
 
+
 // ParseSolrResponse will assign result and build sr.docs if there is a response.
 // If there is no response or grouped property in response it will return error
 func (parser *ExtensiveResultParser) ParseResponse(response *SolrResponse, sr *SolrResult) (err error) {
 	if resp, ok := response.Response["response"].(map[string]interface{}); ok {
 		ParseDocResponse(resp, sr.Results)
+	} else if resp, ok := response.Response["grouped"].(map[string]interface{}); ok {
+		ParseGroupResponse(resp, &sr.GroupedResults)
 	} else {
 		err = fmt.Errorf(`Extensive parser can only parse solr response with response object,
 					ie response.response and response.response.docs. Or grouped response
@@ -113,6 +118,42 @@ func (parser *ExtensiveResultParser) ParseResponse(response *SolrResponse, sr *S
 	}
 
 	return err
+}
+
+func ParseGroupResponse(groupedResponse map[string]interface{}, groupedResults *map[string]GroupResults) {
+	var groupResults *GroupResults
+
+	for field, gr := range groupedResponse {
+		groupResults = new(GroupResults)
+		if grMap, ok := gr.(map[string]interface{}); ok {
+			ParseGroupResults(grMap, groupResults)
+		}
+		(*groupedResults)[field] = (*groupResults)
+	}
+}
+
+func ParseGroupResults(grMap map[string]interface{}, groupResults *GroupResults) {
+	groupResults.Matches = int(grMap["matches"].(float64))
+	if grps, ok := grMap["groups"].([]interface{}); ok {
+		groupResults.Groups = make([]Group, len(grps))
+		for i, grp := range(grps) {
+			if groupMap, ok := grp.(map[string]interface{}); ok {
+				groupResults.Groups[i] = *ParseGroup(groupMap)
+			}
+		}
+	}
+}
+
+func ParseGroup(groupMap map[string]interface{}) *Group {
+	group := new(Group)
+
+	group.GroupValue = groupMap["groupValue"].(string)
+	group.DocList = new(Collection)
+
+	if doclist, ok := groupMap["doclist"].(map[string]interface{}); ok {
+		ParseDocResponse(doclist, group.DocList)
+	}
+	return group
 }
 
 type StandardResultParser struct {
